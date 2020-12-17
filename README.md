@@ -11,5 +11,6 @@ https://www.youtube.com/watch?v=eV1haPUt0NU
 - final_dataset.csv: https://www.mediafire.com/file/nfpmqjuyy6c3iy6/final_dataset.csv/file
 - frequencies.pkl: https://www.mediafire.com/file/mx1npybd355ylsh/frequencies.pickle/file
 - new_data.pkl: https://www.mediafire.com/file/z3d3prd20p9oq36/new_data.pickle/file
+- tf_idf_scores.pkl: https://www.mediafire.com/file/87ddoy3z6xgbrxz/tf_idf_scores.pickle/file
 
-### NEW --> tf_idf_scores.pkl: https://www.mediafire.com/file/87ddoy3z6xgbrxz/tf_idf_scores.pickle/file
+### NEW -> tf_idf_scores_dataset.csv: https://www.mediafire.com/file/qpy3979eewwmghl/tf_idf_scores_dataframe.csv/file

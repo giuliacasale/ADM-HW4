@@ -16,6 +16,7 @@ The repository is organized as follows:
 - `point_1_3.ipynb` that contains all the functions and the code to fully answer to the hashing and algorithmic question
 - `point_2.ipynb` that contains all the steps we followed to pre-process the text, apply the SVD Method, implementing the clustering, and all the visualization of the results with our comments
 - `functions.py` that contains the majority of the functions used in the notebook that contains the cluster question, all described for what they do.
+- `point_2.html` which is the html conversion of the final version of our notebook. We added this additional file because the notebook is quite large and may not load properly by github interpreter.
 
 -----
 **N.B.** To prepare the data to give in input to the K-Means Algorithm, we did a lot of preliminary operations that took a long time to process. We descibed in the notebook step by step each choice we made, but for an easier work, a lot of these functions were runned only the first time and then saved into a file (pkl or csv) and then we load back directly the final output every time we restarted the notebook. These operations can be recognized in the notebook since we then converted them into a markdown cell. We will leave some links below so that those files  can be  directly download and just read inside the notebook, without re-creating them

@@ -11,8 +11,10 @@ from matplotlib import cm
 import multiprocessing.dummy as mp 
 from scipy import spatial
 
+
 # hypeloglog
 import hyperloglog
+
 
 #creation of dictionaries
 import collections
@@ -28,6 +30,7 @@ import sklearn
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.decomposition import PCA
+
 
 #SVD method
 from sklearn.pipeline import make_pipeline
@@ -51,7 +54,8 @@ from mpl_toolkits import mplot3d
                             # ANALYSIS OF THE DATA & PRE-PROCESSING #
 ####################################################################################################
 
-'''this function takes in input a string of text (the review) and returns the pre-processed text'''
+'''this function takes in input a string of text (the review) and returns the
+pre-processed text'''
 
 def pre_processing_data(text):           
     
@@ -78,8 +82,9 @@ def pre_processing_data(text):
     return filtered_text
 
 
-'''this function takes in input a whole dataframe and returns a dictonary where the keys are all the unique words found in the 
-   column 'text_words' of the dataframe, and the values are an identificative number'''
+'''this function takes in input a whole dataframe and returns a dictonary 
+   where the keys are all the unique words found in the column 'text_words'
+   of the dataframe, and for values an identificative number'''
 
 def build_dictionary(df):                            
 
@@ -106,9 +111,7 @@ def build_dictionary(df):
     return dictionary
 
 
- '''This function takes in input the dataframe pre-processed and a list of unique products ID and returns a dictionary
-    where the keys are the productID's and the value are the list of pre-processed words from all the reviews that refer
-    to the same product'''
+
 
 def union_of_reviews_for_same_product(unique_products, data):
 
@@ -127,8 +130,6 @@ def union_of_reviews_for_same_product(unique_products, data):
     return new_data
 
 
- '''Function used to calculate the absolute freuquence of all the words in all the reviews starting from the local
- frequence of the words for each product'''
 
 def frequency(vocabulary,frequency_of_word):
     f = defaultdict()
@@ -137,10 +138,6 @@ def frequency(vocabulary,frequency_of_word):
     return f
 
 
-'''This function takes in input the global frequencies and filter the words by taking only the words with a certian frequence
-Output:
-- useful_words: words whose frequence is between 20 and 20000
-- frequent_words: words whose frequence is higher than 20000 '''
 
 def filter_words(frequencies):
     
@@ -156,7 +153,6 @@ def filter_words(frequencies):
     return(useful_words, frequent_words)
 
 
-'''Function that maps the useful words into integers'''
 
 def new_dictionary(useful_words):
     
@@ -168,15 +164,12 @@ def new_dictionary(useful_words):
     return dictionary
 
 
-'''Function that creates a matrix of occurrency where the rows refer to the product ID and the column to a specific
-word inside the list of useful_words that we selected. This matrix will be used for the SVD method'''
-
 def get_occurrency_matrix(unique_products,dictionary_filtered,frequency_of_word):
     matrix = np.zeros((len(unique_products),len(dictionary_filtered)))
-    for i, product in enumerate(unique_products):            #for every product i  
-        for word,j in dictionary_filtered.items():           #for every word with index j in dictionary_filtered
-            if word in frequency_of_word[i].keys():          #if the word is inside the dictionary *frequency_of_word*
-                matrix[i][j] += frequency_of_word[i][word]   #append that frequence in the correct cell of the matrix
+    for i, product in enumerate(unique_products):           #per ogni prodotto con indice i   
+        for word,j in dictionary_filtered.items():          #per ogni parola con indice j nel dizionario
+            if word in frequency_of_word[i].keys():         #se la parola si trova nel dizionario di frequenze del prodotto
+                matrix[i][j] += frequency_of_word[i][word]
     return matrix
 
 
@@ -185,7 +178,6 @@ def get_occurrency_matrix(unique_products,dictionary_filtered,frequency_of_word)
                                            # SVD METHOD #
 ####################################################################################################
 
-'''Function that from the output of TruncatedSVD recognizes the most relevent words for the clustering and returns them in a list'''
 
 def get_relevant_words(components,features):
     
@@ -206,10 +198,6 @@ def get_relevant_words(components,features):
                                            # TF-IDF SCORES #
 ####################################################################################################
 
-'''function that calculates the term frequency for the reviews of each product and creates a list of dictionaries where each dictionary 
-refers to a single productID. It has for keys all the unique words considered and for values the tf_score = frequency term/total number 
-of words in that plot'''
-
 def tf(frequency_of_word,review_per_product):      
  
     tfs = []
@@ -228,10 +216,6 @@ def tf(frequency_of_word,review_per_product):
         
     return tfs
 
-'''function that calculates the idf score of each token. The output is a dictionary where the keys are the all the different words in 
-the list *relevant_words* and the values are given by log(N/n):
-- N = total number of unique productID
-- n = total number of products in which each token appears'''
 
 
 def idf(relevant_words,frequency_of_word,reviews_per_product):    
@@ -252,10 +236,6 @@ def idf(relevant_words,frequency_of_word,reviews_per_product):
     return idf
 
 
-'''function that puts together the tf and idf score for each productID and for each token. The output is a list of dictionaries where 
-each of them refers to a specific product. The keys are given by the keys in the tf_score dictionary created above and the values are 
-given by multiplying the two scores (tf and idf)'''
-
 def tf_idf_score(tf_score,idf_score,reviews_per_product):    
 
     tf_idf_scores = []
@@ -268,7 +248,6 @@ def tf_idf_score(tf_score,idf_score,reviews_per_product):
     return tf_idf_scores
 
 
-'''Function that trasform the output of the function tf_idf_score into a dataframe to be used in the K-Means algorithm'''
 
 def get_tfidf_scores_matrix(unique_products,relevant_words, tf_idf_scores, final_dictionary):
     n = len(unique_products)
@@ -421,10 +400,6 @@ def k_means(vectors,d,k):
 
 ## QUESTION 1
 
-'''Function that generates a word-cloud visualization for the words in each cluster. It takes in input the final dataframe d 
-that contains the tf.idf.scores of each word for each product, the number of clusters chosen k and the list that tells in which
-cluster was assigned each product'''
-
 def words_cloud(d,k,cluster_list):
     d['cluster']=cluster_list
     for cluster in range(k):
@@ -443,7 +418,7 @@ def words_cloud(d,k,cluster_list):
         
 ## QUESTION 2
 
-'''function that computes the word cloud of only aspecific cluster c'''
+'''computes the word cloud of only cluster c'''
 
 def one_word_cloud(c,d):
     clus_df = d[d.cluster == c]
@@ -458,8 +433,6 @@ def one_word_cloud(c,d):
 
 
 ## QUESTION 3
-
-''''Function that for each cluster plots the distribution of the scores that the users gave for the producuts in that cluster'''
 
 def review_score_distribution(k,df,data):
     score_means = []
@@ -482,10 +455,7 @@ def review_score_distribution(k,df,data):
     
     return score_means
 
-
 ## QUESTION 4
-
-'''Function that computer the number of unique users that wrote reviews for the products in each cluster'''
 
 def number_of_unique_users(k, df, data):
 
@@ -499,7 +469,6 @@ def number_of_unique_users(k, df, data):
         number_of_users = len(d_l.UserId.unique())                  #number of unique users in those rows selected 
 
         print(f'number of unique users writing reviews in cluster {i+1}: {number_of_users}')
-
 
 ####################################################################################################
                                            # DISTANCE MATRIX #
@@ -675,7 +644,7 @@ def optimize(matrix,iterations):
     
     # plots
     plt.figure(figsize=(12,7))
-    plt.plot(range(5,20),scores_e,color='#8DC99B')
+    plt.plot(range(5,25),scores_e,color='#8DC99B')
     plt.title('Elbow method')
     plt.show()
     

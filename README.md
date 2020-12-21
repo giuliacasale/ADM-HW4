@@ -1,4 +1,11 @@
 # ADM-HOMEWORK 4: HARD CODING
+
+### Group's Members:
+- Danial Abri
+- Martina Betti
+- Giulia Casale
+
+----
 The aim of this homework was to write important algorithms and functions from scratch.
 The homework was divided into three main parts:
 1. **HASHING**: we had to write our own hash function and then use it to implment the hyperloglog algorithm. The final goal was to return the *cardinality of the dataset* and the *error of the filter*.

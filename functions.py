@@ -1,11 +1,23 @@
 #basic libraries
 from math import *
+import math
 import random
 import pandas as pd
 import numpy as np
 import numpy.matlib
+import time
+import random
+from matplotlib import cm
+import multiprocessing.dummy as mp 
+from scipy import spatial
+
+
+# hypeloglog
+import hyperloglog
+
 
 #creation of dictionaries
+import collections
 from collections import defaultdict
 from collections import Counter
 
@@ -17,6 +29,8 @@ import ast
 import sklearn
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.decomposition import PCA
+
 
 #SVD method
 from sklearn.pipeline import make_pipeline
@@ -34,7 +48,7 @@ from nltk.tokenize import RegexpTokenizer
 import seaborn as sns
 import matplotlib.pyplot as plt
 import wordcloud
-
+from mpl_toolkits import mplot3d
 
 ####################################################################################################
                             # ANALYSIS OF THE DATA & PRE-PROCESSING #
@@ -184,12 +198,12 @@ def get_relevant_words(components,features):
                                            # TF-IDF SCORES #
 ####################################################################################################
 
-def tf(frequency_of_word,review_per_products):      
+def tf(frequency_of_word,review_per_product):      
  
     tfs = []
 
-    for i, item in enumerate(reviews_per_product.items()):
-        text_filtered = reviews_per_product[item[0]]
+    for i, item in enumerate(review_per_product.items()):
+        text_filtered = review_per_product[item[0]]
 
         tf = dict.fromkeys(text_filtered,0)
         tot_number_of_words = len(text_filtered)
@@ -456,4 +470,206 @@ def number_of_unique_users(k, df, data):
 
         print(f'number of unique users writing reviews in cluster {i+1}: {number_of_users}')
 
+####################################################################################################
+                                           # DISTANCE MATRIX #
+####################################################################################################
 
+''' for each product among the first 1500 rows we calculate the distance between product i and all products '''
+def build_distance_matrix(final_dictionary):
+    prods = range(len(final_dictionary))[:1500] 
+    matrix ={i: [] for i in range(1500)}    
+
+    for i in prods:                           
+        p = mp.Pool()    # function for multiprocessing
+        p.map(calculate_distance,prods)       
+    return matrix
+
+
+def calculate_distance(j,i,matrix,final_dictionary,all_words):
+    prod1 = final_dictionary[i] # we extract the tf-idf vector for product i
+    prod2 = final_dictionary[j] # we extract the tf-idf vector for product j
+    scores1 = []                # in this lists we will save the scores for calculating the cosine distance
+    scores2 = []
+    for word in all_words:      # we iterate the sorted list of words (we need to ensure that the indexes are the same)
+        try:                      
+            scores1.append(prod1[word]) # if that word is in the product we add the score
+        except:
+            scores1.append(1)           # else we add 1 (max distance)
+        try:
+            scores2.append(prod2[word])
+        except:
+            scores2.append(1)
+    matrix[i].append(spatial.distance.cosine(scores1,scores2)) # we compute the cosine distance between the two lists (1 - cosine similarity)
+
+    return matrix  
+
+'''Here we build kmeans by assuming we start from a distance matrix'''
+
+def kmeans(k, matrix, centroids):   
+    
+    # inizializing output
+    n_clusters = dict(zip(centroids,range(k)))            # cluster number centroids
+    clusters = {i: [] for i in range(k)}                  # empty dictionary for clusters
+    WSS = {i: 0 for i in range(k)}                        # will be used to calculate within cluster sum of squares
+    
+    for point1 in range(len(matrix)):                     # for each point 
+        dist = 1                                          # we assume max dist in a range 0-1
+        
+        # for each centroid (cluster)
+        for center in centroids:                          
+            cluster_points = clusters[n_clusters[center]] # we consider all points in that cluster
+            centroid_dist = matrix[center][point1]        # we calulate distance from centroid
+            cum_dist = 0
+            for point2 in cluster_points:                 # for each point in the centroid cluster
+                cum_dist += matrix[point1][point2]        # we sum all distances
+            
+            mean_dist = (cum_dist+centroid_dist)/(len(cluster_points)+1) # we get the mean distance 
+
+            if mean_dist < dist:                          # we check if the mean distance between the point and the centroid cluster is smaller than the previous dist
+                cluster_id = n_clusters[center]           # assignes (temporarely) the point to cluster is k
+                dist = mean_dist                          # update distance from centroid
+        
+        # point1 is assigned to the best cluster 
+        clusters[cluster_id].append(point1)               # update with best cluster
+        WSS[cluster_id] += dist                           # updating the chosed cluster with the squared distance from centroid
+    
+    # calculate mean distance for each cluster (wss)
+    WSS = np.mean([WSS[i]/len(clusters[i]) for i in range(k)]) 
+    
+    return clusters, centroids, n_clusters, WSS
+
+def ElbowMethod(matrix,threshold):
+    
+    # inizialization
+    elbow = []
+    ks = range(5,25)
+    
+    # trying different clusters
+    for k in ks:                                              # for each number of clusters
+        centroids = random.sample(range(1, len(matrix)), k)   # pick random points
+        clusters, centers, n_clusters, WSS = kmeans(k,matrix,centroids)
+        elbow.append(WSS)                                     # we append for each iteration the WSS score
+    i = 1                                                     
+    optimal = 0                                               # we want to best compromise btw low n of clusters and low WSS
+    
+    # applying threshold
+    stop = ((max(elbow)-min(elbow))/100)*threshold+min(elbow)
+    while elbow[i] > stop and i<len(elbow)-1:                 # we stop when have reached the threshold% of optimal number of clusters     
+        i+=1
+        optimal = elbow[i]
+    
+    return elbow, ks[i]
+
+def silhouette_method(matrix):
+    
+    #inizialization
+    ks = range(5,25)
+    # points = {i: {} for i in ks} 
+    scores = {}
+    
+    # trying different clusters 
+    for k in ks:                                                      # for each number of clusters
+        centroids = random.sample(range(1, len(matrix)), k)           # pick random points
+        clusters, centers, n_clusters, WSS = kmeans(k,matrix,centroids)# we apply k-means
+        s_score = {}
+        points = {}                                                   # add a dictionary where keys are the point and clusters id are the value
+        
+        # creating points dictionary
+        for cluster in clusters.keys():                               # for each cluster in k-means
+            points.update(dict(zip(clusters[cluster],[cluster]*len(clusters[cluster])))) 
+        
+        # calculating mean distance and silhouette score
+        for point1 in points.keys():                                  # for each point
+            point1_cluster = points[point1]                           # we extract its cluster
+            in_distance = 0
+            out_distance = 0
+            points_in = clusters[point1_cluster]                      # points in same cluster
+            points_out = set(points.keys()).difference(set(points_in))# any other point
+            
+            for point2 in points_in:                                  # for each point in the same cluster
+                in_distance+=matrix[point1][point2]                   # we add distance btw point1 and point2 to in_distance
+            for point2 in points_out:                                 # for each any other point 
+                out_distance+=matrix[point1][point2]                  # we add distance btw point1 and point2 to out_distance
+            
+            avarage_in = in_distance/len(points_in)                   # we compute avarage distance for both
+            avarage_out = out_distance/len(points_out)
+            s = (avarage_out-avarage_in)/max(avarage_in,avarage_out)  # we calculate silhouette score
+            s_score[point1]=s                                         # we store sil_score for each point
+        
+        scores[k]=s_score
+    
+    df=pd.DataFrame.from_dict(scores)
+    
+    return df, df.columns[df.sum().argmax()]
+
+def kmeans_optimize(k,matrix,iterations):
+    
+    # inizialization
+    plot_data={}
+    all_wss = []
+    all_centers = []
+    
+    # simulations
+    for i in range(iterations):                               # for each simulation
+        centroids = random.sample(range(1, len(matrix)), k)   # pick random points
+        itr = []
+        clusters, centers, n_clusters, WSS = kmeans(k,matrix,centroids) # a different set of random centroids is generated
+        for n in n_clusters.values():                         # for each cluster 
+            itr.append(len(clusters[n])/len(matrix))          # we save the percentage of point it contains
+        plot_data['iter_'+str(i)]=itr                         # save data to plot for each iteration
+        all_wss.append(WSS)                                   # save WSS for each iteration
+        all_centers.append(centers)                           # save centroids
+    
+    # defining best result
+    best = all_wss.index(min(all_wss))                       # the best result is that with lowest wss score
+    
+    return plot_data,all_centers,all_wss,best
+
+def optimize(matrix,iterations):
+    
+    # optimal number of clusters methods:
+    # 1. elbow method
+    scores_e, e = ElbowMethod(matrix,30)
+    print('Elbow method: Optimal number of clusters is',e)
+    # 2. silhouette method
+    scores_s, s = silhouette_method(matrix)
+    print('Silhouette method: Optimal number of clusters is',scores_s.columns[scores_s.sum().argmax()])    
+    # best number of clouds
+    k = (e+s)//2
+    
+    # randomly picking points
+    plot_data,all_centers,all_wss,best = kmeans_optimize(k,matrix,iterations)
+    print('The best iteration is', best,' whith centroids:', all_centers[best])
+    centroids = all_centers[best]
+    
+    # plots
+    plt.figure(figsize=(12,7))
+    plt.plot(range(5,20),scores_e,color='#8DC99B')
+    plt.title('Elbow method')
+    plt.show()
+    
+    scores_s.sum().plot.barh(figsize=(12,7),color='#8DC99B')
+    plt.title('Silhouette method')
+    
+    colors = sns.color_palette("Pastel1")
+    pd.DataFrame.from_dict(plot_data,orient='index').plot.barh(stacked=True,color=colors, figsize=(12,7))
+    plt.legend(loc='best',bbox_to_anchor=(0.7,0.5, 0.5, 0.5))
+    plt.title('Best centroids')
+
+    
+    return centroids, k
+
+####################################################################################################
+                                           # PLOTS #
+####################################################################################################
+
+
+def encircle(x,y, ax=None, **kw):
+    ''' This function encircle points beloning to the same cluster to make visualization easier'''
+    if not ax: ax=plt.gca()
+    p = np.c_[x,y]
+    mean = np.mean(p, axis=0)
+    d = p-mean
+    r = np.max(np.sqrt(d[:,0]**2+d[:,1]**2 ))
+    circ = plt.Circle(mean, radius=0.8*r,**kw)
+    ax.add_patch(circ)
